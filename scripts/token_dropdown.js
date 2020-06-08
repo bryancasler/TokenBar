@@ -95,14 +95,15 @@ function rollSkillMacro(event, payload) {
 
 function rollItemMacro(itemName) {
     //check for modules installed and change macro depending on that, change itemName to itemDatastructure
-    if(game.modules.get("betterrolls5e").active){
+    /*if(game.modules.get("betterrolls5e").active){
         //send id to macro
     } else
     if (game.modules.get("itemacro".active)){
         ItemMacro.runMacro(itemName);
     } else {
         game.dnd5e.rollItemMacro(itemName);    
-    }  
+    }*/
+    game.dnd5e.rollItemMacro(itemName);
 }
 
 function getTargetActor() {
