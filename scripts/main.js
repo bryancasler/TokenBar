@@ -38,5 +38,14 @@ function registerSettings(){
         default : "game5e"
     });
 
+    game.settings.register("TokenBar",'enable', {
+        name : "Enable Token Bar",
+        hint : "Uncheck if you would like to disable Token Bar",
+        scope : "client",
+        config : true,
+        default : true,
+        type : Boolean
+    });
+
     if(debug) {log(data,game.settings);}
 }

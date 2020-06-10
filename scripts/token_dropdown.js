@@ -22,13 +22,22 @@
  */
 const regenerateBarUntilClosed = true;
 let debug = true;
+let enable = true;
 let log = (...args) => console.log("Token Action Dropdown Bar | ", ...args);
 
+Hooks.once("setup",() => {
+    window.TokenBar = {
+        toggle : function() {
+            enable = !enable;
+        }
+    };
+});
 export function initSetup(){
-    generateBar();
-    if (debug) log("Bar Created.");
+    if(enable && game.settings.get('TokenBar','enable')) {
+        generateBar();
+        if (debug) log("Bar Created.");
+    }
 }
-
 async function generateBar () {
     let oldBar = document.getElementById("show-action-dropdown-bar");
     if (oldBar != null)
@@ -89,20 +98,41 @@ async function generateBar () {
         }
     });
 }
-
 function rollAbilityMacro(event, payload) {
     //going to need to check for modules here as well
-    let checkDetails = payload;  
-    game.actors.find(a => a._id == checkDetails.actorId).rollAbility(checkDetails.checkId, {event: event});
+    let roller = game.settings.get('TokenBar','roller');
+    let actor = game.actors.find(a=>a._id === payload.actorId);
+    if(debug) {log(event,payload,roller);}
+    switch(roller) {
+        case "betterrolls5e" :
+            //either have to ask the question here or split it up :(
+            betterRollquickFix(actor,payload.checkId);
+            break;
+        case "minor-qol" :
+        case "itemacro" :
+        case "game5e" :
+            actor.rollAbility(payload.checkId,{event : event});
+            break;
+        default :
+    } 
 }
-
 function rollSkillMacro(event, payload) {
     //going to need to check for modules here as well
     let roller = game.settings.get('TokenBar','roller');
-    let checkDetails = payload;
-    game.actors.find(a => a._id == checkDetails.actorId).rollSkill(checkDetails.checkId, {event: event});
+    let actor = game.actors.find(a=>a._id === payload.actorId);
+    if(debug) {log(event,payload,roller);}
+    switch(roller) {
+        case "betterrolls5e" :
+            BetterRolls.rollSkill(actor,payload.checkId,{})
+            break;
+        case "minor-qol" :
+        case "itemacro" :
+        case "game5e" :
+            actor.rollSkill(payload.checkId,{event : event});
+            break;
+        default :
+    }
 }
-
 function rollItemMacro(event,_id) {
     //Error Check - problem w/ spells and MinorQOL
     let itemId = _id;
@@ -125,7 +155,6 @@ function rollItemMacro(event,_id) {
         default :
     }
 }
-
 function getTargetActor() {
     const controlled = canvas.tokens.controlled;
     if (debug) log(game.user.isGM, controlled.length);
@@ -139,7 +168,6 @@ function getTargetActor() {
         return controlled[0].actor;
     } else {return null;}
 }
-
 function getData(targetActor) {
 
     function buildActionsList(targetActor) {
@@ -152,7 +180,6 @@ function getData(targetActor) {
         let consumables = targetActor.data.items.filter(i => i.type == "consumable");
         let items = { "weapons": weapons, "equipment": equipment, "other": other, "consumables": consumables };
 
-        //cantrips are required to be prepared to display (FIX THIS!)
         let preparedSpells = targetActor.data.items.filter(i => i.type == "spell" && i.data.preparation.prepared);
         let spells = categoriseSpells(preparedSpells);
 
@@ -493,9 +520,7 @@ function getData(targetActor) {
     var content =  `<div id="actionDialog">${innerContent}</div>`;
     
     return content;
-}
-
-    
+}   
 function clickDropdownContent(event) {
     if (event.target.value == undefined || event.target.value == "")
         return false;
@@ -505,7 +530,6 @@ function clickDropdownContent(event) {
 
     return false;
 }
-
 /* 
  * I have no idea if all this decoding and encoding is dangerous or not, but it was the only way
  * I could think of to manage strange weapon, feat, and item strings, or passing
@@ -544,4 +568,35 @@ function checkPermision(entity = ""){
     }
     return false;
 }
-
+function betterRollquickFix(actor, checkId)
+{
+    let choice = "";
+    new Dialog({
+        title : "Better Rolls Quick Fix Ability Chooser.",
+        content : `
+            <div class ="form-group">
+                <h1>Select Roll Type</h1>
+            </div>`,
+        buttons : {
+            one : {
+                icon :`<i class="fas fa-check"></i>`,
+                label : "Ability Check",
+                callback : () => choice = "check"
+            },
+            two : {
+                icon :`<i class="fa fa-life-ring"></i>`,
+                label : "Ability Save",
+                callback : () => choice = "save"
+            }
+        },
+        default : "Cancel",
+        close : (html) => {
+            if(choice === "check")
+            {
+                BetterRolls.rollCheck(actor,checkId,{})
+            }else if (choice === "save"){
+                BetterRolls.rollSave(actor,checkId,{});
+            }
+        }
+    }).render(true);
+}
