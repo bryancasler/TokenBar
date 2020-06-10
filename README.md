@@ -12,6 +12,18 @@ Once activated, select a token that has an actor/character sheet associated with
 
 ![In Action](https://cdn.discordapp.com/attachments/513918036919713802/719633520292528148/1.gif)
 
+Settings can change how the output is handled as well as if you want the module active on specific clients.
+
+![In Action](https://cdn.discordapp.com/attachments/513918036919713802/720274868716961902/Settings.gif)
+
+Better Rolls 5e Support
+
+![In Action](https://cdn.discordapp.com/attachments/513918036919713802/720274901034074162/BetterRolls.gif)
+
+Minor Quality of Life Support
+
+![In Action](https://cdn.discordapp.com/attachments/513918036919713802/720274925629210715/MinorQOL.gif)
+
 
 # Support
 For questions, feature requests, or bug reports, feel free to contact me on the Foundry Discord (Kekilla#7036) or open an issue here directly.
