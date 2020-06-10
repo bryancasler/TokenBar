@@ -3,11 +3,11 @@
 	"title" : "Token Action Dropdown Bar",
 	"description" : "Creates Bar to Control a tokens actions.",
 	"author" : ["^ and stick#0520", "kekilla#7036"],
-	"version" : "0.1.01",
+	"version" : "0.1.02",
 	"minimumCoreVersion" : "0.6.0",
 	"esmodules" : ["scripts/main.js"],
 	"systems" : ["dnd5e"],
 	"url" : "https://github.com/Kekilla0/TokenBar",
 	"manifest" : "https://github.com/Kekilla0/TokenBar/raw/master/module.json",
-	"download" : "https://github.com/Kekilla0/TokenBar/archive/v0.1.01.zip"
+	"download" : "https://github.com/Kekilla0/TokenBar/archive/v0.1.02.zip"
 }

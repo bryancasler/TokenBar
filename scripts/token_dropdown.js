@@ -5,10 +5,15 @@
  * Works off the selected token or user's character, if they're a player.
  * 
  * To reposition, adjust the let x and let y variables between 
- * line 33 and line 36.
+ * line 33 and line 36. Change this to incoorperate moving the bar.
  * 
  * Update the roll macros by changing getRollItemMacro, getRollAbilityCheckMacro, 
- * and getRollSkillCheckMacro.
+ * and getRollSkillCheckMacro. Line 98 change to allow for use with other modules and 
+ * line 343 to change from just name to name+_id(or the other way around).
+ * 
+ * Fix issue with cantrips (non-prepared) not being populated to the list.
+ * 
+ * Create an UI to give players choice to add or remove from the list.
  * 
  * If regenerateBarUntilClosed is set to true, the bar will continue to
  * respawn/refresh when a legitimate token is clicked on. 
@@ -16,13 +21,14 @@
  * author/blame/feedback: ^ and stick#0520
  */
 const regenerateBarUntilClosed = true;
-let debug = false;
+let debug = true;
 let log = (...args) => console.log("Token Action Dropdown Bar | ", ...args);
 
 export function initSetup(){
     generateBar();
-    log("Bar Created.");
+    if (debug) log("Bar Created.");
 }
+
 async function generateBar () {
     let oldBar = document.getElementById("show-action-dropdown-bar");
     if (oldBar != null)
@@ -49,6 +55,8 @@ async function generateBar () {
         targetId = targetActor._id;
     }
 
+    //save coordiants and retrieve
+    //click on bar?? let them move it
     let navBounds = document.getElementById("navigation").getBoundingClientRect();
     let y = navBounds.bottom + 20;
 
@@ -75,8 +83,7 @@ async function generateBar () {
                     return;
                     
                 if (actor!= null && actor._id != currentBarActorId)
-                    log(`Regenerating token action bar for ${actor.name} (id: ${actor._id})`);
-            
+                    if (debug) log(`Regenerating token action bar for ${actor.name} (id: ${actor._id})`);
                 generateBar();
             })();
         }
@@ -84,26 +91,39 @@ async function generateBar () {
 }
 
 function rollAbilityMacro(event, payload) {
+    //going to need to check for modules here as well
     let checkDetails = payload;  
     game.actors.find(a => a._id == checkDetails.actorId).rollAbility(checkDetails.checkId, {event: event});
 }
 
 function rollSkillMacro(event, payload) {
+    //going to need to check for modules here as well
+    let roller = game.settings.get('TokenBar','roller');
     let checkDetails = payload;
     game.actors.find(a => a._id == checkDetails.actorId).rollSkill(checkDetails.checkId, {event: event});
 }
 
-function rollItemMacro(itemName) {
-    //check for modules installed and change macro depending on that, change itemName to itemDatastructure
-    /*if(game.modules.get("betterrolls5e").active){
-        //send id to macro
-    } else
-    if (game.modules.get("itemacro".active)){
-        ItemMacro.runMacro(itemName);
-    } else {
-        game.dnd5e.rollItemMacro(itemName);    
-    }*/
-    game.dnd5e.rollItemMacro(itemName);
+function rollItemMacro(event,_id) {
+    //Error Check - problem w/ spells and MinorQOL
+    let itemId = _id;
+    let itemName = getTargetActor().data.items.find(i=>i._id===itemId).name;
+    let roller = game.settings.get('TokenBar','roller');
+    if(debug) {log(event,itemId,roller);}
+    switch(roller) {
+        case "game5e" :
+            game.dnd5e.rollItemMacro(itemName);
+            break;
+        case "betterrolls5e" :
+            BetterRolls.quickRollById(getTargetActor()._id,itemId);
+            break;
+        case "minor-qol" :
+            MinorQOL.doRoll(event,itemId);
+            break;
+        case "itemacro" :
+            rollItemMacro.runMacro(itemId);
+            break;
+        default :
+    }
 }
 
 function getTargetActor() {
@@ -132,6 +152,7 @@ function getData(targetActor) {
         let consumables = targetActor.data.items.filter(i => i.type == "consumable");
         let items = { "weapons": weapons, "equipment": equipment, "other": other, "consumables": consumables };
 
+        //cantrips are required to be prepared to display (FIX THIS!)
         let preparedSpells = targetActor.data.items.filter(i => i.type == "spell" && i.data.preparation.prepared);
         let spells = categoriseSpells(preparedSpells);
 
@@ -227,7 +248,6 @@ function getData(targetActor) {
                 if (f.data.activation.type == key)
                     return false;
             }
-            
             return true;
         });
 
@@ -308,8 +328,7 @@ function getData(targetActor) {
         let template = `<div class="show-action-dropdown-content-subtitle">${title}</div>
                         <div class="show-action-dropdown-content-actions">`;
         for (let i of items) {
-            let encodedName = encodeURIComponent(i.name);
-            template += `<button value="item.${encodedName}">${i.name}</button>`;    
+            template += `<button value="item.${i._id}">${i.name}</button>`;    
         } 
 
         template += `</div>`;
@@ -331,14 +350,10 @@ function getData(targetActor) {
                             <div class="show-action-dropdown-content-actions">`;
 
             for (let s of entries) {
-                let name = s.name;
-                let encodedName = encodeURIComponent(name);
-                template += `<button value="spell.${encodedName}">${name}</button>`;    
+                template += `<button value="spell.${s._id}">${s.name}</button>`;    
             }
-
             template += `</div>`;
         }
-        
         return template;
     }
 
@@ -347,17 +362,12 @@ function getData(targetActor) {
             return "";
         
         let template = `<div class="show-action-dropdown-content-subtitle">${subtitle}</div>
-                        <div class="show-action-dropdown-content-actions">`
+                        <div class="show-action-dropdown-content-actions">`;
                         
         for (let [index, f] of feats) {
-            let name = f.name;
-            let encodedName = encodeURIComponent(name);
-            template += `<button value="feat.${encodedName}">${name}</button>`;    
+            template += `<button value="feat.${f._id}">${f.name}</button>`;    
         }
-
-        template += `</div>`
-        
-
+        template += `</div>`;
         return template;
     }
 
@@ -468,7 +478,6 @@ function getData(targetActor) {
             .show-action-dropdown:hover .show-action-dropdown-content {
                 display: block;
             }
-
         </style>`
     }
 
@@ -508,7 +517,8 @@ function clickMacroButton(event) {
 
     let value = event.target.value;
     let macroType = value.substr(0, value.indexOf('.'));
-    let payload = decodeURIComponent(value.substr(value.indexOf(".") + 1, value.length));
+    let payload = decodeURIComponent(value.substr(value.indexOf(".") +1, value.length));
+    if(debug) log("event : ",event," value : ",value," macroType : ",macroType," payload : ",payload);
     var checkDetails;
     switch (macroType) {
         case "abilityCheck":
@@ -522,7 +532,7 @@ function clickMacroButton(event) {
         case "item":
         case "spell":
         case "feat":
-            rollItemMacro(payload);
+            rollItemMacro(event,payload);
             break;
         default:
             break;
