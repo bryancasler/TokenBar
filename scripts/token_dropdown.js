@@ -180,9 +180,9 @@ function getData(targetActor) {
         let consumables = targetActor.data.items.filter(i => i.type == "consumable");
         let items = { "weapons": weapons, "equipment": equipment, "other": other, "consumables": consumables };
         
-        let preparedSpells = targetActor.data.items.find(i => ['Sorcerer', 'Warlock'].includes(i.name))
-            ? targetActor.data.items.filter(i => i.type == "spell")
-            : targetActor.data.items.filter(i => i.type == "spell" && i.data.preparation.prepared);
+        let preparedSpells = targetActor.data.items.find(i => ['artificer', 'cleric', 'druid', 'wizard', 'paladin'].includes(i.name.toLowerCase()))
+            ? targetActor.data.items.filter(i => i.type == "spell" && (i.data.preparation.prepared || i.data.preparation.mode === 'always' || i.data.level === 0))
+            : targetActor.data.items.filter(i => i.type == "spell");
         let spells = categoriseSpells(preparedSpells);
 
         let allFeats = targetActor.data.items.filter(i => i.type == "feat");
