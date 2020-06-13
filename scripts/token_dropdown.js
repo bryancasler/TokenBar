@@ -7,21 +7,16 @@
  * To reposition, adjust the let x and let y variables between 
  * line 33 and line 36. Change this to incoorperate moving the bar.
  * 
- * Update the roll macros by changing getRollItemMacro, getRollAbilityCheckMacro, 
- * and getRollSkillCheckMacro. Line 98 change to allow for use with other modules and 
- * line 343 to change from just name to name+_id(or the other way around).
- * 
- * Fix issue with cantrips (non-prepared) not being populated to the list.
- * 
  * Create an UI to give players choice to add or remove from the list.
  * 
  * If regenerateBarUntilClosed is set to true, the bar will continue to
  * respawn/refresh when a legitimate token is clicked on. 
  * 
- * author/blame/feedback: ^ and stick#0520
+ * author/blame/feedback: kekilla#7036
+ * Based on the work of ^ and stick#0520
  */
 const regenerateBarUntilClosed = true;
-let debug = true;
+let debug = false;
 let enable = true;
 let log = (...args) => console.log("Token Action Dropdown Bar | ", ...args);
 
@@ -32,10 +27,10 @@ Hooks.once("setup",() => {
         }
     };
 });
+
 export function initSetup(){
     if(enable && game.settings.get('TokenBar','enable')) {
         generateBar();
-        if (debug) log("Bar Created.");
     }
 }
 async function generateBar () {
@@ -72,7 +67,7 @@ async function generateBar () {
     let controlBounds = document.getElementById("controls").getBoundingClientRect();
     let x = controlBounds.right + 50;
 
-    const $dispOptions = $(`<div title="${targetId}" id="show-action-dropdown-bar" style="display: ${display}; z-index: 70; position: fixed; top: ${y}px; height: auto; left: ${x}px; background-color: #bbb">${data}</div>`).appendTo(document.body);
+    const $dispOptions = $(`<div class="tokenbar" targetID="${targetId}" id="show-action-dropdown-bar" style="display: ${display}; z-index: 70; position: fixed; top: ${y}px; height: auto; left: ${x}px; background-color: #bbb">${data}</div>`).appendTo(document.body);
 
     $(document.body).on("click.showTokenActionBar", evt => {
         clickMacroButton(evt);
@@ -86,7 +81,7 @@ async function generateBar () {
                 let actor = getTargetActor();
                 let bar = document.getElementById("show-action-dropdown-bar");
                 
-                let currentBarActorId = bar.title;
+                let currentBarActorId = bar.targetID;
                 
                 if (actor != null && actor._id == currentBarActorId)
                     return;
@@ -102,11 +97,17 @@ function rollAbilityMacro(event, payload) {
     //going to need to check for modules here as well
     let roller = game.settings.get('TokenBar','roller');
     let actor = game.actors.find(a=>a._id === payload.actorId);
-    if(debug) {log(event,payload,roller);}
+    if(debug) {log("ROLL ABILITY MACRO | ",event,payload,roller);}
     switch(roller) {
         case "betterrolls5e" :
-            //either have to ask the question here or split it up :(
-            betterRollquickFix(actor,payload.checkId);
+            let param = {};
+            if(event.originalEvent.shiftKey){
+                param += { adv : 1 };
+            }
+            if(event.originalEvent.cntlKey){
+                param += {disadv :1};
+            }
+            betterRollquickFix(actor,payload.checkId, param);
             break;
         case "minor-qol" :
         case "itemacro" :
@@ -123,7 +124,14 @@ function rollSkillMacro(event, payload) {
     if(debug) {log(event,payload,roller);}
     switch(roller) {
         case "betterrolls5e" :
-            BetterRolls.rollSkill(actor,payload.checkId,{})
+            let param = {};
+            if(event.originalEvent.shiftKey){
+                param += { adv : 1 };
+            }
+            if(event.originalEvent.cntlKey){
+                param += {disadv :1};
+            }
+            BetterRolls.rollSkill(actor,payload.checkId,param)
             break;
         case "minor-qol" :
         case "itemacro" :
@@ -144,13 +152,21 @@ function rollItemMacro(event,_id) {
             game.dnd5e.rollItemMacro(itemName);
             break;
         case "betterrolls5e" :
+            let param = {};
+            if(event.originalEvent.shiftKey){
+                param += { adv : 1 };
+            }
+            if(event.originalEvent.cntlKey){
+                param += {disadv :1};
+            }
+            //need to update function used once documentation is added.
             BetterRolls.quickRollById(getTargetActor()._id,itemId);
             break;
         case "minor-qol" :
             MinorQOL.doRoll(event,itemId);
             break;
         case "itemacro" :
-            rollItemMacro.runMacro(itemId);
+            ItemMacro.runMacro(getTargetActor()._id,itemId);
             break;
         default :
     }
@@ -171,27 +187,57 @@ function getTargetActor() {
 function getData(targetActor) {
 
     function buildActionsList(targetActor) {
-        let equipped = targetActor.data.items.filter(i => i.type !="consumable" && i.data.equipped);
-        let activeEquipped = getActiveEquipment(equipped);
-        let weapons = activeEquipped.filter(i => i.type == "weapon");
-        let equipment = activeEquipped.filter(i => i.type == "equipment");
+        //check PC type => data.type "npc" || "character"
+        if(targetActor.data.type === "character"){
+            //Items
+            let equipped = targetActor.data.items.filter(i => i.type !="consumable" && i.data.equipped);
+            let activeEquipped = getActiveEquipment(equipped);
+            let weapons = activeEquipped.filter(i => i.type == "weapon");
+            let equipment = activeEquipped.filter(i => i.type == "equipment");
+            let other = activeEquipped.filter(i => i.type != "weapon" && i.type != "equipment");
+            let consumables = targetActor.data.items.filter(i => i.type == "consumable");     
+            let items = { "weapons": weapons, "equipment": equipment, "other": other, "consumables": consumables };
+            
+            //Spells (expand to be more than 1 type of spell maybe) (MIGHT HAVE TO CHANGE THIS TO SOMETHING THAT MAKES MORE SENSE TO ME!!!)
+            let preparedSpells = targetActor.data.items.find(i => ['artificer', 'cleric', 'druid', 'wizard', 'paladin'].includes(i.name.toLowerCase()))
+                ? targetActor.data.items.filter(i => i.type == "spell" && (i.data.preparation.prepared || i.data.preparation.mode === 'always' || i.data.level === 0 || i.data.preparation.mode === 'atwill' || i.data.preparation.mode === 'innate'))
+                : targetActor.data.items.filter(i => i.type == "spell");
+            let spells = categoriseSpells(preparedSpells);
 
-        let other = activeEquipped.filter(i => i.type != "weapon" && i.type != "equipment");
-        let consumables = targetActor.data.items.filter(i => i.type == "consumable");
-        let items = { "weapons": weapons, "equipment": equipment, "other": other, "consumables": consumables };
-        
-        let preparedSpells = targetActor.data.items.find(i => ['artificer', 'cleric', 'druid', 'wizard', 'paladin'].includes(i.name.toLowerCase()))
-            ? targetActor.data.items.filter(i => i.type == "spell" && (i.data.preparation.prepared || i.data.preparation.mode === 'always' || i.data.level === 0))
-            : targetActor.data.items.filter(i => i.type == "spell");
-        let spells = categoriseSpells(preparedSpells);
+            //feats
+            let allFeats = targetActor.data.items.filter(i => i.type == "feat");
+            let actionFeats = allFeats.filter(i=>i.data.activation.type==="action");
+            let bonusFeats = allFeats.filter(i=>i.data.activation.type==="bonus");
+            let reactionFeats = allFeats.filter(i=>i.data.activation.type == "reaction");
+            let timeFeats = allFeats.filter(i=>i.data.activation.type === "minute" || i.data.activation.type === "hour" || i.data.activation.type === "day");
+            let otherFeats = allFeats.filter(i=>i.data.activation.type === "special" || i.data.activation.type === "none");
+            let feats = {"Action" : actionFeats, "Bonus" : bonusFeats, "Reaction" : reactionFeats, "Time" : timeFeats, "Other" : otherFeats};
+            return { "items": items,"spells": spells, "feats": feats };
 
-        let allFeats = targetActor.data.items.filter(i => i.type == "feat");
-        let activeFeats = getActiveFeats(allFeats);
-        let passiveFeats =  getPassiveFeats(allFeats);
-        let feats = {"active": activeFeats, "passive": passiveFeats};
-        
+        }else if (targetActor.data.type === "npc"){
+            //Items
+            let equipped = targetActor.data.items.filter(i => i.type !="consumable" && i.data.equipped);
+            let weapons = equipped.filter(i=>i.type==="weapon");
+            let equipment = equipped.filter(i => i.type == "equipment");
+            let other = equipped.filter(i => i.type != "weapon" && i.type != "equipment");
+            let consumables = targetActor.data.items.filter(i => i.type == "consumable");
+            let items = { "weapons": weapons, "equipment": equipment, "other": other, "consumables": consumables };
+            
+            //Spells
+            let spellList = targetActor.data.items.filter(i=>i.type =="spell");
+            let spells = categoriseSpells(spellList);
 
-        return { "items": items,"spells": spells, "feats": feats };
+            //Feats 
+            let allFeats = targetActor.data.items.filter(i => i.type == "feat");
+            let actionFeats = allFeats.filter(i=>i.data.activation.type==="action");
+            let bonusFeats = allFeats.filter(i=>i.data.activation.type==="bonus");
+            let reactionFeats = allFeats.filter(i=>i.data.activation.type == "reaction");
+            let legendaryFeats = allFeats.filter(i=>i.data.activation.type==="legendary");
+            let lairFeats = allFeats.filter(i=>i.data.activation.type==="lair");
+            let passiveFeats = allFeats.filter(i=>i.data.activation.type==="");
+            let feats = {"Action": actionFeats, "Bonus": bonusFeats, "Reaction" : reactionFeats, "Legendary" : legendaryFeats, "Lair": lairFeats, "Passive" : passiveFeats};
+            return { "items": items,"spells": spells, "feats": feats };
+        }
     }
 
     function buildChecksList(targetActor) {
@@ -203,6 +249,8 @@ function getData(targetActor) {
 
     function getActiveEquipment(equipment) {
         const activationTypes = Object.entries(game.dnd5e.config.abilityActivationTypes);
+
+        if(debug) log("GET ACTIVE EQUIPMENT | ", equipment);
 
         let activeEquipment = equipment.filter(e => {
             if (e.data.activation == undefined)
@@ -216,16 +264,20 @@ function getData(targetActor) {
             return false;
         });
 
+        if(debug) log("GET ACTIVE EQUIPMENT | ", activeEquipment);
+
         return activeEquipment;
     }
 
     function categoriseSpells(spells) {
+        //need to add rituals to their own tag
         let powers = {};
         let book = {}
 
         book = spells.reduce(function (book, spell) {
             var level = spell.data.level;
             let prep = spell.data.preparation.mode;
+            let ritual = spell.data.components.ritual;
 
             const prepTypes = game.dnd5e.config.spellPreparationModes;
             let prepType = prepTypes[prep];
@@ -234,16 +286,13 @@ function getData(targetActor) {
                 if (!powers.hasOwnProperty(prepType)) {
                     powers[prepTypes[prep]] = [];
                 }
-
-                powers[prepType].push(spell);
+                powers[prepType].push(spell);               
             } else {
                 if (!book.hasOwnProperty(level)) {
                     book[level] = [];
                 }
-
                 book[level].push(spell);
             }
-
             return book;
         }, {});
         
@@ -336,16 +385,22 @@ function getData(targetActor) {
     }
 
     function getFeatsTemplate(feats) {
-        if (feats.active.length + feats.passive.length === 0)
+        let checkValue = 0;
+        for (let feat in feats) 
+        {
+            checkValue += feat.length;
+        }
+        if(checkValue === 0)
             return "";
 
         let template = `<div class="show-action-dropdown">
                             <button value="showActionFeats" class="show-action-dropdown-button">Feats</button>
-                                <div id="showActionFeats" class="show-action-dropdown-content">
-                                ${getFeatsCategoryTemplate("Active", feats.active)}
-                                ${getFeatsCategoryTemplate("Passive", feats.passive)}
-                            </div>
-                        </div>`;
+                                <div id="showActionFeats" class="show-action-dropdown-content">`;
+        //for each in feats ==> ${getFeatsCategoryTemplate("Active", feats.active)}
+        for (let feat in feats){
+            template += `${getFeatsCategoryTemplate(feat, feats[feat])}`;
+        }
+        template += '</div></div>';
 
         return template;
     }
@@ -393,7 +448,7 @@ function getData(targetActor) {
         let template = `<div class="show-action-dropdown-content-subtitle">${subtitle}</div>
                         <div class="show-action-dropdown-content-actions">`;
                         
-        for (let [index, f] of feats) {
+        for (let f of feats) {
             template += `<button value="feat.${f._id}">${f.name}</button>`;    
         }
         template += `</div>`;
@@ -570,7 +625,7 @@ function checkPermision(entity = ""){
     }
     return false;
 }
-function betterRollquickFix(actor, checkId)
+function betterRollquickFix(actor, checkId, param)
 {
     let choice = "";
     new Dialog({
@@ -595,9 +650,9 @@ function betterRollquickFix(actor, checkId)
         close : (html) => {
             if(choice === "check")
             {
-                BetterRolls.rollCheck(actor,checkId,{})
+                BetterRolls.rollCheck(actor,checkId,param)
             }else if (choice === "save"){
-                BetterRolls.rollSave(actor,checkId,{});
+                BetterRolls.rollSave(actor,checkId,param);
             }
         }
     }).render(true);

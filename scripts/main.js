@@ -1,7 +1,7 @@
 //Import TypeScript Modules
 import * as token_dropdown from './token_dropdown.js';
 
-let debug = true;
+let debug = false;
 let log = (...args) => console.log("Token Action Dropdown Bar | ", ...args);
 
 Hooks.on('init', ()=> {
@@ -10,6 +10,7 @@ Hooks.on('init', ()=> {
 
 Hooks.on('ready', () =>{
     canvas.tokens.releaseAll();
+    checkSettings();
 });
 
 /* Initialize Module */
@@ -48,4 +49,28 @@ function registerSettings(){
     });
 
     if(debug) {log(data,game.settings);}
+}
+function checkSettings(){
+    let roller = game.settings.get('TokenBar','roller');
+    switch(roller) {
+        case "betterrolls5e" :
+            if(game.modules.get("betterrolls5e") === undefined || game.modules.get("betterrolls5e").active === false)
+            {
+                game.settings.set('TokenBar','roller','game5e');
+            }
+            break;
+        case "minor-qol" :
+            if(game.modules.get("minor-qol") === undefined || game.modules.get("minor-qol").active === false)
+            {
+                game.settings.set('TokenBar','roller','game5e');
+            }
+            break;
+        case "itemacro" :
+            if(game.modules.get("itemacro") === undefined || game.modules.get("itemacro").active === false)
+            {
+                game.settings.set('TokenBar','roller','game5e');
+            }
+            break;
+        default :
+    }
 }
