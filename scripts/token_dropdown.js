@@ -9,16 +9,12 @@
  * 
  * Create an UI to give players choice to add or remove from the list.
  * 
- * If regenerateBarUntilClosed is set to true, the bar will continue to
- * respawn/refresh when a legitimate token is clicked on. 
- * 
  * author/blame/feedback: kekilla#7036
  * Based on the work of ^ and stick#0520
  */
-const regenerateBarUntilClosed = true;
 let debug = false;
 let enable = true;
-let log = (...args) => console.log("Token Action Dropdown Bar | ", ...args);
+let log = (...args) => console.log("Token Bar | ", ...args);
 
 Hooks.once("setup",() => {
     window.TokenBar = {
@@ -29,7 +25,13 @@ Hooks.once("setup",() => {
 });
 
 export function initSetup(){
-    if(enable && game.settings.get('TokenBar','enable')) {
+    if(!game.user.isGM)
+    {
+        if(game.settings.get('TokenBar','player') && enable && game.settings.get('TokenBar','enable'))
+        {
+            generateBar();
+        }
+    }else if (enable && game.settings.get('TokenBar','enable')){
         generateBar();
     }
 }
@@ -39,14 +41,13 @@ async function generateBar () {
         oldBar.remove();
 
     $(document.body).off("click.showTokenActionBar");
+    $(document.body).off("contextmenu.showTokenActionBar");
 
     const cancel = () => {
         $dispOptions.remove();
         $(document.body).off("click.showTokenActionBar");
     };
 
-    // If regenerateBarUntilClosed is true, but no actor is selected, simply hide the bar
-    // but keep the click-monitoring process alive.
     let targetActor = getTargetActor();
     var display, data, targetId;
     if (targetActor == null) {
@@ -59,7 +60,7 @@ async function generateBar () {
         targetId = targetActor._id;
     }
 
-    //save coordiants and retrieve
+    //save coordiants and retrieve => client/user flag (TokenBar,Coord)
     //click on bar?? let them move it
     let navBounds = document.getElementById("navigation").getBoundingClientRect();
     let y = navBounds.bottom + 20;
@@ -70,26 +71,36 @@ async function generateBar () {
     const $dispOptions = $(`<div class="tokenbar" targetID="${targetId}" id="show-action-dropdown-bar" style="display: ${display}; z-index: 70; position: fixed; top: ${y}px; height: auto; left: ${x}px; background-color: #bbb">${data}</div>`).appendTo(document.body);
 
     $(document.body).on("click.showTokenActionBar", evt => {
+        if (event.target.value === undefined) return;
+
         clickMacroButton(evt);
+        Hooks.once(`updateActor`, (parent) =>{
+            if(parent.data._id === getTargetActor().data._id){
+                generateBar();
+            }
+        });
+        Hooks.once(`updateOwnedItem`, (parent) => {
+            if(parent.data._id === getTargetActor().data._id){
+                generateBar();
+            }
+        });
         let close = clickDropdownContent(evt);
         if (close) {
             cancel();
             return;
-        }
-        if (regenerateBarUntilClosed) {
-            (async () => {
-                let actor = getTargetActor();
-                let bar = document.getElementById("show-action-dropdown-bar");
-                
-                let currentBarActorId = bar.targetID;
-                
-                if (actor != null && actor._id == currentBarActorId)
-                    return;
-                    
-                if (actor!= null && actor._id != currentBarActorId)
-                    if (debug) log(`Regenerating token action bar for ${actor.name} (id: ${actor._id})`);
-                generateBar();
-            })();
+        }       
+    });
+    $(document.body).on("contextmenu.showTokenActionBar", evt => {
+        if (event.target.value === undefined) return;
+        let value = event.target.value;
+        
+        let macroType = value.substr(0, value.indexOf('.'));
+        let roller = game.settings.get('TokenBar','roller');
+
+        if((macroType === "item" || macroType === "spell") && roller === "minor-qol"){
+            clickMacroButton(evt);
+        }else {
+            return "";
         }
     });
 }
@@ -212,6 +223,7 @@ function getData(targetActor) {
             let timeFeats = allFeats.filter(i=>i.data.activation.type === "minute" || i.data.activation.type === "hour" || i.data.activation.type === "day");
             let otherFeats = allFeats.filter(i=>i.data.activation.type === "special" || i.data.activation.type === "none");
             let feats = {"Action" : actionFeats, "Bonus" : bonusFeats, "Reaction" : reactionFeats, "Time" : timeFeats, "Other" : otherFeats};
+
             return { "items": items,"spells": spells, "feats": feats };
 
         }else if (targetActor.data.type === "npc"){
@@ -232,10 +244,12 @@ function getData(targetActor) {
             let actionFeats = allFeats.filter(i=>i.data.activation.type==="action");
             let bonusFeats = allFeats.filter(i=>i.data.activation.type==="bonus");
             let reactionFeats = allFeats.filter(i=>i.data.activation.type == "reaction");
+            let otherFeats = allFeats.filter(i=>i.data.activation.type === "minute" || i.data.activation.type === "hour" || i.data.activation.type === "day" || i.data.activation.type === "special");
             let legendaryFeats = allFeats.filter(i=>i.data.activation.type==="legendary");
             let lairFeats = allFeats.filter(i=>i.data.activation.type==="lair");
-            let passiveFeats = allFeats.filter(i=>i.data.activation.type==="");
-            let feats = {"Action": actionFeats, "Bonus": bonusFeats, "Reaction" : reactionFeats, "Legendary" : legendaryFeats, "Lair": lairFeats, "Passive" : passiveFeats};
+            let passiveFeats = allFeats.filter(i=>i.data.activation.type===""|| i.data.activation.type === "none");
+            let feats = {"Action": actionFeats, "Bonus": bonusFeats, "Reaction" : reactionFeats,"Legendary" : legendaryFeats, "Lair": lairFeats, "Passive" : passiveFeats,"Other" : otherFeats};
+
             return { "items": items,"spells": spells, "feats": feats };
         }
     }
@@ -299,40 +313,9 @@ function getData(targetActor) {
         return {"book": Object.entries(book), "powers": Object.entries(powers)};
     }
 
-    function getActiveFeats(feats) {
-        const activationTypes = Object.entries(game.dnd5e.config.abilityActivationTypes);
-        let activeFeats = feats.filter(f => {
-            if (f.data.activation == undefined)
-                return false;
-
-            for (let [key, value] of activationTypes) {
-                if (f.data.activation.type == key)
-                    return true;
-            }
-            
-            return false;
-        });
-
-        return Object.entries(activeFeats);
-    }
-
-    function getPassiveFeats(feats) {
-        const activationTypes = Object.entries(game.dnd5e.config.abilityActivationTypes);
-        let passiveFeats = feats.filter(f => {
-            if (f.data.activation == undefined)
-                return false;
-
-            for (let [key, value] of activationTypes) {
-                if (f.data.activation.type == key)
-                    return false;
-            }
-            return true;
-        });
-
-        return Object.entries(passiveFeats);
-    }
-
     function getContentTemplate(actions, checks) {
+
+        //change this to check if has an entry => adds it
         let template = `
         <div class="show-action-form">
             ${getCssStyle()}
@@ -412,7 +395,12 @@ function getData(targetActor) {
         let template = `<div class="show-action-dropdown-content-subtitle">${title}</div>
                         <div class="show-action-dropdown-content-actions">`;
         for (let i of items) {
-            template += `<button value="item.${i._id}">${i.name}</button>`;    
+            if(i.type === "consumable")
+            {
+                template += `<button value ="item.${i._id}">${i.name} : ${i.data.quantity}</button>`;
+            }else {
+                template += `<button value="item.${i._id}">${i.name}</button>`;  
+            }   
         } 
 
         template += `</div>`;
@@ -426,9 +414,19 @@ function getData(targetActor) {
 
         let template = "";
 
+        let spellSlots = getTargetActor().data.data.spells;
+
         for (let [level, entries] of spells) {
             let levelNo = level.toString().charAt(0);
             let subtitle = isNaN(levelNo) ? level : (levelNo === "0" ? `Cantrips` : `Level ${levelNo}`);
+
+            if(level === "Pact Magic"){
+                subtitle += ` : ${spellSlots["pact"].value} / ${spellSlots["pact"].max}`;
+            }
+            if(!isNaN(levelNo) && levelNo !== "0")
+            {
+                subtitle += ` : ${spellSlots[`spell${level}`].value} / ${spellSlots[`spell${level}`].max}`;
+            }
 
             template += `<div class="show-action-dropdown-content-subtitle">${subtitle}</div>
                             <div class="show-action-dropdown-content-actions">`;
@@ -449,7 +447,13 @@ function getData(targetActor) {
                         <div class="show-action-dropdown-content-actions">`;
                         
         for (let f of feats) {
-            template += `<button value="feat.${f._id}">${f.name}</button>`;    
+            if(f.data.uses.max > 0)
+            {
+                template += `<button value="feat.${f._id}">${f.name} : ${f.data.uses.value} / ${f.data.uses.max}</button>`;
+            }else{
+                template += `<button value="feat.${f._id}">${f.name}</button>`;
+            }
+                
         }
         template += `</div>`;
         return template;
@@ -587,11 +591,6 @@ function clickDropdownContent(event) {
 
     return false;
 }
-/* 
- * I have no idea if all this decoding and encoding is dangerous or not, but it was the only way
- * I could think of to manage strange weapon, feat, and item strings, or passing
- * skill and ability checks with the actorId. :dealwithit:
-*/
 function clickMacroButton(event) {
     if (event.target.value == undefined || event.target.value == "")
         return;

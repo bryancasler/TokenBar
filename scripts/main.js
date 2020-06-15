@@ -2,7 +2,7 @@
 import * as token_dropdown from './token_dropdown.js';
 
 let debug = false;
-let log = (...args) => console.log("Token Action Dropdown Bar | ", ...args);
+let log = (...args) => console.log("Token Bar | ", ...args);
 
 Hooks.on('init', ()=> {
     registerSettings();
@@ -23,12 +23,17 @@ function registerSettings(){
     //check for active modules, then if active add to data
     let data = { "game5e" : "Core 5e" };
     if(game.modules.get("betterrolls5e") !== undefined && game.modules.get("betterrolls5e").active === true)
-    {mergeObject(data,{"betterrolls5e" : "Better Rolls for 5e"});}
+    {
+        mergeObject(data,{"betterrolls5e" : "Better Rolls for 5e"});
+    }
     if(game.modules.get("minor-qol") !== undefined && game.modules.get("minor-qol").active === true)
-    {mergeObject(data,{"minor-qol" : "Minor Quality of Life"});}
+    {
+        mergeObject(data,{"minor-qol" : "Minor Quality of Life"});
+    }
     if(game.modules.get("itemacro") !== undefined && game.modules.get("itemacro").active === true)
-    {mergeObject(data,{"itemacro" : "Item Macro"});}
-
+    {
+        mergeObject(data,{"itemacro" : "Item Macro"});
+    }
     game.settings.register("TokenBar",'roller', {
         name : "Token Bar Roll Type",
         hint : "Choose output for Token Bar.",
@@ -38,16 +43,22 @@ function registerSettings(){
         choices : data,
         default : "game5e"
     });
-
+    game.settings.register("TokenBar",'player', {
+        name : "Allow Players to Use Token Bar?",
+        hint : "Disable to restrict use to only GM",
+        scope : "world",
+        config : true,
+        type : Boolean,
+        default : true
+    });
     game.settings.register("TokenBar",'enable', {
         name : "Enable Token Bar",
-        hint : "Uncheck if you would like to disable Token Bar",
+        hint : "Uncheck if you (user) would like to disable Token Bar",
         scope : "client",
         config : true,
         default : true,
         type : Boolean
     });
-
     if(debug) {log(data,game.settings);}
 }
 function checkSettings(){
