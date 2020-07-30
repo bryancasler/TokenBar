@@ -183,7 +183,7 @@ function rollItemMacro(event,_id) {
             {
                 game.dnd5e.rollItemMacro(item.name);
             }else{
-                ItemMacro.runMacro(app.actor.id,item.id);
+                ItemMacro.runMacro(getTargetActor()._id,itemId);
             }
             break;
         default :
