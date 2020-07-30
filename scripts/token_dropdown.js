@@ -155,12 +155,12 @@ function rollSkillMacro(event, payload) {
 function rollItemMacro(event,_id) {
     //Error Check - problem w/ spells and MinorQOL
     let itemId = _id;
-    let itemName = getTargetActor().data.items.find(i=>i._id===itemId).name;
+    let item = getTargetActor().data.items.find(i=>i._id===itemId);
     let roller = game.settings.get('TokenBar','roller');
     if(debug) {log(event,itemId,roller);}
     switch(roller) {
         case "game5e" :
-            game.dnd5e.rollItemMacro(itemName);
+            game.dnd5e.rollItemMacro(item.name);
             break;
         case "betterrolls5e" :
             let param = {};
@@ -177,7 +177,14 @@ function rollItemMacro(event,_id) {
             MinorQOL.doRoll(event,itemId);
             break;
         case "itemacro" :
-            ItemMacro.runMacro(getTargetActor()._id,itemId);
+            let flags = item.flags.itemacro?.macro;
+
+            if(flags === undefined || flags?.data.command === "")
+            {
+                game.dnd5e.rollItemMacro(item.name);
+            }else{
+                runMacro(app.actor.id,item.id);
+            }
             break;
         default :
     }
