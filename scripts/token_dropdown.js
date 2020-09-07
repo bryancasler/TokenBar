@@ -68,7 +68,7 @@ async function generateBar () {
     let controlBounds = document.getElementById("controls").getBoundingClientRect();
     let x = controlBounds.right + 50;
 
-    const $dispOptions = $(`<div class="tokenbar" targetID="${targetId}" id="show-action-dropdown-bar" style="display: ${display}; z-index: 70; position: fixed; top: ${y}px; height: auto; left: ${x}px; background-color: #bbb">${data}</div>`).appendTo(document.body);
+    const $dispOptions = $(`<div class="tokenbar" targetID="${targetId}" id="show-action-dropdown-bar" style="display: ${display}; z-index: 70; position: fixed; top: ${y}px; height: auto; left: ${x}px;">${data}</div>`).appendTo(document.body);
 
     $(document.body).on("click.showTokenActionBar", evt => {
         if (event.target.value === undefined) return;
@@ -511,18 +511,28 @@ function getData(targetActor) {
     function getCssStyle() {
         return `
         <style type="text/css">
-            .show-action-dropdowns {
-                margin: 5px;
-            }
-
+            /* Mirror FoundryVTT's native styling */
             .show-action-dropdown-button {
                 width: auto;
                 height: auto;
-                background-color: #eee;
-                padding: 5px 8px;
-                border: none;
+                padding: 3px 8px;
                 cursor: pointer;
+                background: url("../ui/denim075.png") repeat;
+                box-shadow: 0 0 10px #000000;
+                color: #f0f0e0;
+                text-align: center;
+                border: 1px solid #000000;
+                margin-left: 0;
+                margin-right: 0;
             }
+
+            /* Mirror FoundryVTT's native styling */
+            .show-action-dropdown-button:hover,
+            .show-action-dropdown-button:active{
+                color: #ffffff;
+                border: 1px solid red;
+                box-shadow: 0 0 10px #ff6400;
+            }       
             
             /* The container <div> - needed to position the dropdown content */
             .show-action-dropdown {
@@ -535,10 +545,14 @@ function getData(targetActor) {
                 display: none;
                 max-width: 700px;
                 padding: 8px;
-                background-color: #aaa;
+                background: url("ui/parchment.jpg") repeat;
                 position: absolute;
-                box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+                box-shadow: 0 0 10px #000000;
+                border: 1px solid #000000;
                 z-index: 99;
+                border-top-right-radius: 5px;
+                border-bottom-left-radius: 5px;
+                border-bottom-right-radius: 5px;
             }
 
             .show-action-dropdown-content-actions {
@@ -550,8 +564,16 @@ function getData(targetActor) {
                 font-size: medium;
             }
             
+            /* Mirror the D&D5e Sheet Styling */
             .show-action-dropdown-content-subtitle {
-                font-size: small;
+                font-weight: 700;
+                color: #191813;
+                margin-bottom: 5px;
+            }
+
+            /* For all sub-titles other than the first, give vertical breakthing rooming by adding top padding */
+            .show-action-dropdown-content-subtitle:not(:first-child){
+                margin-top: 10px;
             }
 
             /* Links inside the dropdown */
@@ -562,11 +584,26 @@ function getData(targetActor) {
                 font-size: small;
                 text-decoration: none;
                 display: inline;
+                background: var(--default-faint-color);
+                color: #191813;
+                margin-left: 0px;
+                margin-right: 5px;            
             }
             
+            /* For all Action Buttons other than the last one, give some vertical spacing between them should they wrap to multiple rows. */
+            .show-action-dropdown-content-actions button:not(:last-child) {
+                margin-bottom: 5px;
+            }    
+
+            /* For all Action Buttons other than the last one, give some horiztonal spacing to their right should more than one appear in the same row */
+            .show-action-dropdown-content-actions button::last-child {
+                margin-right: 5px;  
+            }
+
             /* Change color of dropdown links on hover */
-            .show-action-dropdown-content-actions button:hover {
-                background-color: #f1f1f1
+            .show-action-dropdown-content-actions button:hover,
+            .show-action-dropdown-content-actions button:active {
+                cursor: pointer;
             }
             
             /* Show the dropdown menu on hover */
